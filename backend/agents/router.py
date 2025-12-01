@@ -1,0 +1,68 @@
+"""
+AI Router Agent using OpenRouter API.
+"""
+from openai import AsyncOpenAI
+from config import settings
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Initialize OpenRouter client (OpenAI-compatible)
+client = AsyncOpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=settings.openrouter_api_key,
+)
+
+SYSTEM_PROMPT = """You are a friendly and helpful AI sales assistant for a boutique e-commerce store.
+Your name is "SalesBot".
+
+Your goals are:
+1. Greet customers warmly.
+2. Help them find products they are looking for.
+3. Answer questions about products.
+4. Guide them through the ordering process.
+
+Tone:
+- Professional yet conversational.
+- Enthusiastic but not over-the-top.
+- Concise (WhatsApp messages should be short and easy to read).
+- Use emojis sparingly to add warmth.
+
+If a user asks for products, ask them what specifically they are looking for (e.g., "What kind of products are you interested in? We have electronics, clothing, and accessories.").
+
+If you don't understand, ask for clarification politely.
+"""
+
+async def process_message(message_text: str, session_id: str = None) -> str:
+    """
+    Process a user message using OpenRouter AI.
+    
+    Args:
+        message_text: The user's input message.
+        session_id: (Optional) Session ID for context (future implementation).
+        
+    Returns:
+        The agent's text response.
+    """
+    try:
+        logger.info(f"Router Agent processing: {message_text}")
+        
+        # Call OpenRouter API (OpenAI-compatible)
+        response = await client.chat.completions.create(
+            model="x-ai/grok-2-1212",  # Free fast model from X.AI
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": message_text}
+            ],
+            max_tokens=300,
+            temperature=0.7,
+        )
+        
+        ai_response = response.choices[0].message.content
+        logger.info(f"Generated response: {ai_response[:100]}...")
+        
+        return ai_response
+        
+    except Exception as e:
+        logger.error(f"Error in Router Agent: {str(e)}", exc_info=True)
+        return "I'm having a little trouble right now. Could you try again? 😊"
