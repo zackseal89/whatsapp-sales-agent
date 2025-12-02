@@ -1,6 +1,7 @@
 import { Sidebar } from '@/components/dashboard/sidebar'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { OrderNotification } from '@/components/dashboard/OrderNotification'
 
 export default async function DashboardLayout({
   children,
@@ -22,6 +23,7 @@ export default async function DashboardLayout({
           {children}
         </div>
       </main>
+      <OrderNotification />
     </div>
   )
 }

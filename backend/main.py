@@ -4,6 +4,8 @@ FastAPI application for WhatsApp AI Sales Agent webhook handling.
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+import re
+import json
 from config import settings
 
 # Configure logging
@@ -129,6 +131,29 @@ async def process_message(from_number: str, message_text: str, message_sid: str)
         from agents import process_message as run_agent
         response_text = await run_agent(message_text)
         logger.info(f"AI response generated: {response_text[:100]}...")
+        
+        # Check for order details in the response
+        order_match = re.search(r'<ORDER_DETAILS>(.*?)</ORDER_DETAILS>', response_text, re.DOTALL)
+        if order_match:
+            try:
+                order_json_str = order_match.group(1).strip()
+                logger.info(f"Found order details: {order_json_str}")
+                order_details = json.loads(order_json_str)
+                
+                # Create order in Supabase
+                await supabase_client.create_order(
+                    customer_id=customer_id,
+                    items=order_details.get('items', []),
+                    total=order_details.get('total', 0)
+                )
+                
+                # Remove the tag from the response sent to the user
+                response_text = re.sub(r'<ORDER_DETAILS>.*?</ORDER_DETAILS>', '', response_text, flags=re.DOTALL).strip()
+                
+            except Exception as e:
+                logger.error(f"Error processing order details: {str(e)}")
+                # We don't stop the response, just log the error
+
         
         # 5. Store outbound message BEFORE sending (for reliability)
         logger.info("Storing outbound message")

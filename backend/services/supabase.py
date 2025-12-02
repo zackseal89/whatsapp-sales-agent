@@ -165,6 +165,45 @@ class SupabaseClient:
             logger.error(f"Error in search_products: {str(e)}")
             raise
 
+    async def create_order(
+        self,
+        customer_id: str,
+        items: list[Dict[str, Any]],
+        total: float
+    ) -> Dict[str, Any]:
+        """
+        Create a new order.
+        
+        Args:
+            customer_id: Customer UUID
+            items: List of order items
+            total: Total order amount
+            
+        Returns:
+            Created order record
+        """
+        try:
+            # Generate a simple order number (timestamp based for MVP)
+            import time
+            order_number = f"ORD-{int(time.time())}"
+            
+            order_data = {
+                'customer_id': customer_id,
+                'status': 'pending_payment',
+                'total': total,
+                'items': items,
+                'order_number': order_number
+            }
+            
+            result = self.client.table('orders').insert(order_data).execute()
+            
+            logger.info(f"Created order {order_number} for customer {customer_id}")
+            return result.data[0]
+            
+        except Exception as e:
+            logger.error(f"Error in create_order: {str(e)}")
+            raise
+
 
 # Global Supabase client instance
 supabase_client = SupabaseClient()

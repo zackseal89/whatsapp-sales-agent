@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import Link from 'next/link'
 import {
   Table,
   TableBody,
@@ -56,12 +57,14 @@ export default async function ConversationsPage() {
             {conversations?.map((conversation) => (
               <TableRow key={conversation.id}>
                 <TableCell>
-                  <div className="font-medium">
-                    {conversation.customer?.name || 'Unknown'}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {conversation.whatsapp_number}
-                  </div>
+                  <Link href={`/conversations/${conversation.id}`} className="block">
+                    <div className="font-medium">
+                      {conversation.customer?.name || 'Unknown'}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {conversation.whatsapp_number}
+                    </div>
+                  </Link>
                 </TableCell>
                 <TableCell>
                   <Badge variant={conversation.status === 'active' ? 'default' : 'secondary'}>
@@ -87,7 +90,9 @@ export default async function ConversationsPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem>View details</DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href={`/conversations/${conversation.id}`}>View details</Link>
+                      </DropdownMenuItem>
                       <DropdownMenuItem>Archive conversation</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
