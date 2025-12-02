@@ -204,6 +204,35 @@ class SupabaseClient:
             logger.error(f"Error in create_order: {str(e)}")
             raise
 
+    async def get_recent_messages(
+        self,
+        conversation_id: str,
+        limit: int = 10
+    ) -> list[Dict[str, Any]]:
+        """
+        Get recent messages for a conversation.
+        
+        Args:
+            conversation_id: Conversation UUID
+            limit: Number of messages to retrieve
+            
+        Returns:
+            List of message records, ordered by created_at asc
+        """
+        try:
+            result = self.client.table('messages').select('*').eq(
+                'conversation_id', conversation_id
+            ).order('created_at', desc=True).limit(limit).execute()
+            
+            # Return reversed list (oldest first) for context
+            messages = result.data[::-1] if result.data else []
+            logger.info(f"Retrieved {len(messages)} recent messages for conversation {conversation_id}")
+            return messages
+            
+        except Exception as e:
+            logger.error(f"Error in get_recent_messages: {str(e)}")
+            return []
+
 
 # Global Supabase client instance
 supabase_client = SupabaseClient()

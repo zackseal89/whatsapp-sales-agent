@@ -79,7 +79,7 @@ async def whatsapp_webhook_handler(request: Request):
     # Process the message
     await process_message(from_number, message_text, message_sid)
     
-    return Response(content="OK", media_type="text/plain")
+    return Response(content="", media_type="text/plain")
 
 
 async def process_message(from_number: str, message_text: str, message_sid: str):
@@ -129,7 +129,11 @@ async def process_message(from_number: str, message_text: str, message_sid: str)
         # 4. Generate AI response
         logger.info("Generating AI response")
         from agents import process_message as run_agent
-        response_text = await run_agent(message_text)
+        
+        # Fetch conversation history
+        history = await supabase_client.get_recent_messages(conversation['id'], limit=10)
+        
+        response_text = await run_agent(message_text, message_history=history)
         logger.info(f"AI response generated: {response_text[:100]}...")
         
         # Check for order details in the response

@@ -22,6 +22,8 @@ Your goals are:
 3. Answer questions about products.
 4. Guide them through the ordering process.
 
+You have access to the conversation history. Use it to provide context-aware responses and remember user details (like their name or preferences) if previously mentioned.
+
 IMPORTANT: You are an "Order Taker" only. You do NOT process payments.
 - When a user wants to buy something, ask for the specific items and quantities.
 - Once the user confirms the order, you MUST output the order details in a special XML tag.
@@ -51,13 +53,13 @@ If a user asks for products, ask them what specifically they are looking for (e.
 If you don't understand, ask for clarification politely.
 """
 
-async def process_message(message_text: str, session_id: str = None) -> str:
+async def process_message(message_text: str, message_history: list = None) -> str:
     """
     Process a user message using OpenRouter AI.
     
     Args:
         message_text: The user's input message.
-        session_id: (Optional) Session ID for context (future implementation).
+        message_history: List of previous messages for context.
         
     Returns:
         The agent's text response.
@@ -65,13 +67,25 @@ async def process_message(message_text: str, session_id: str = None) -> str:
     try:
         logger.info(f"Router Agent processing: {message_text}")
         
+        # Build messages list with system prompt
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        
+        # Add history if available
+        if message_history:
+            for msg in message_history:
+                role = "assistant" if msg.get("sender_type") == "agent" else "user"
+                messages.append({"role": role, "content": msg.get("message_text", "")})
+        
+        # Add current user message only if it's not already the last message in history
+        # (Since we store the message before calling the agent, it might be in history)
+        last_msg_text = message_history[-1].get("message_text") if message_history else ""
+        if last_msg_text != message_text:
+            messages.append({"role": "user", "content": message_text})
+        
         # Call OpenRouter API (OpenAI-compatible)
         response = await client.chat.completions.create(
             model="openai/gpt-3.5-turbo",  # Reliable low-cost model
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": message_text}
-            ],
+            messages=messages,
             max_tokens=300,
             temperature=0.7,
         )
