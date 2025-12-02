@@ -67,7 +67,7 @@ async def process_message(message_text: str, session_id: str = None) -> str:
         
         # Call OpenRouter API (OpenAI-compatible)
         response = await client.chat.completions.create(
-            model="x-ai/grok-2-1212",  # Free fast model from X.AI
+            model="openai/gpt-3.5-turbo",  # Reliable low-cost model
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": message_text}
