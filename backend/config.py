@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     port: int = 8000
     environment: str = "development"
     log_level: str = "INFO"
+
+    # Cache TTLs (kept for compatibility)
+    redis_ttl_conversation_history: int = 300
+    redis_ttl_customer_data: int = 1800
     
     model_config = SettingsConfigDict(
         env_file=".env",

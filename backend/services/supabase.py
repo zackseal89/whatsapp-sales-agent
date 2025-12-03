@@ -4,6 +4,7 @@ Uses Supabase Python SDK with service role key for admin access.
 """
 from supabase import create_client, Client
 from config import settings
+from services.cache import cache
 import logging
 from typing import Optional, Dict, Any
 
@@ -32,22 +33,43 @@ class SupabaseClient:
             Customer record dict with id, whatsapp_number, etc.
         """
         try:
+            # Check cache first
+            cached_customer = await cache.get_cached_customer(whatsapp_number)
+            if cached_customer:
+                logger.info(f"Cache hit for customer: {whatsapp_number}")
+                return cached_customer
+
             # Try to find existing customer
             result = self.client.table('customers').select('*').eq(
                 'whatsapp_number', whatsapp_number
             ).limit(1).execute()
             
             if result.data and len(result.data) > 0:
-                logger.info(f"Found existing customer: {result.data[0]['id']}")
-                return result.data[0]
+                customer = result.data[0]
+                logger.info(f"Found existing customer: {customer['id']}")
+                # Cache the result
+                await cache.set_cached_customer(
+                    whatsapp_number, 
+                    customer, 
+                    ttl=settings.redis_ttl_customer_data
+                )
+                return customer
             
             # Create new customer
             new_customer = self.client.table('customers').insert({
                 'whatsapp_number': whatsapp_number
             }).execute()
             
-            logger.info(f"Created new customer: {new_customer.data[0]['id']}")
-            return new_customer.data[0]
+            customer = new_customer.data[0]
+            logger.info(f"Created new customer: {customer['id']}")
+            
+            # Cache the new customer
+            await cache.set_cached_customer(
+                whatsapp_number, 
+                customer, 
+                ttl=settings.redis_ttl_customer_data
+            )
+            return customer
             
         except Exception as e:
             logger.error(f"Error in get_or_create_customer: {str(e)}")

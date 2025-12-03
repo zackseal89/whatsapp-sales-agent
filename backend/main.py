@@ -6,7 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 import re
 import json
+import asyncio
 from config import settings
+from services.cache import cache
 
 # Configure logging
 logging.basicConfig(
@@ -100,14 +102,18 @@ async def process_message(from_number: str, message_text: str, message_sid: str)
         # Import Supabase client
         from services.supabase import supabase_client
         
-        # 1. Get or create customer
-        logger.info(f"Getting/creating customer for {clean_number}")
+        # 1 & 2. Get/create customer and conversation in parallel
+        logger.info(f"Getting/creating customer and conversation for {clean_number}")
+        
+        # We need customer_id for conversation creation if it doesn't exist
+        # So we first get/create customer, then conversation
+        # Ideally we'd parallelize fully, but conversation depends on customer_id
+        # Optimization: Check cache for customer first (handled in supabase_client)
+        
         customer = await supabase_client.get_or_create_customer(clean_number)
         customer_id = customer['id']
         logger.info(f"Customer ID: {customer_id}")
         
-        # 2. Get or create active conversation
-        logger.info(f"Getting/creating conversation for customer {customer_id}")
         conversation = await supabase_client.get_or_create_conversation(
             customer_id=customer_id,
             whatsapp_number=clean_number
@@ -130,8 +136,20 @@ async def process_message(from_number: str, message_text: str, message_sid: str)
         logger.info("Generating AI response")
         from agents import process_message as run_agent
         
-        # Fetch conversation history
-        history = await supabase_client.get_recent_messages(conversation['id'], limit=10)
+        # Fetch conversation history (try cache first)
+        history = await cache.get_cached_conversation_history(conversation['id'])
+        
+        if history is None:
+            logger.info("Cache miss for conversation history - fetching from DB")
+            history = await supabase_client.get_recent_messages(conversation['id'], limit=10)
+            # Cache the result
+            await cache.set_cached_conversation_history(
+                conversation['id'], 
+                history, 
+                ttl=settings.redis_ttl_conversation_history
+            )
+        else:
+            logger.info("Cache hit for conversation history")
         
         response_text = await run_agent(message_text, message_history=history)
         logger.info(f"AI response generated: {response_text[:100]}...")
@@ -178,6 +196,9 @@ async def process_message(from_number: str, message_text: str, message_sid: str)
         )
         
         logger.info(f"✅ Complete! Customer {customer_id}, Conversation {conversation_id}, Response sent to {clean_number}")
+        
+        # Invalidate cache so next request gets fresh history including this new message
+        await cache.invalidate_conversation_cache(conversation_id)
         
     except Exception as e:
         logger.error(f"❌ Error processing message: {str(e)}", exc_info=True)
